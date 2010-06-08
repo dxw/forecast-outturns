@@ -8,7 +8,11 @@ http://coins.labs.thedextrousweb.com/
 
 == Requirements
 
- gem install pg json
+- Ruby
+- PostgreSQL
+- Rubygems
+  - pg
+  - json
 
 == Usage
 
