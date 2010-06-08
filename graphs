@@ -214,7 +214,7 @@ write_html("html/index.html", 'Index') do
   <p>
     We've released the code that generates these graphs, and the PostgreSQL database we're using to query COINS.
     If you'd like to work on this some more to make it better, we're all for it! Visit us on 
-    <a href='http://www.github.com/dxw/'>Github</a> for more information.
+    <a href='http://www.github.com/dxw/forecast-outturns'>GitHub</a> for more information.
   </p>
 
   <h2>Departments</h2>
