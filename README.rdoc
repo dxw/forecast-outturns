@@ -1,0 +1,33 @@
+= forecast-outturns
+
+Working example:
+
+http://coins.labs.thedextrousweb.com/
+
+== Requirements
+
+ gem install pg json
+
+== Usage
+
+First import the PostgreSQL database:
+
+ createdb coins
+ wget http://coins.labs.thedextrousweb.com/data/postgresql/fact_table_extract_2009_10.sql.gz
+ zcat fact_table_extract_2009_10.sql.gz | psql coins
+
+Then:
+
+ ./graphs
+
+And in html/ you have all the graphs.
+
+== Data
+
+PostgreSQL data, as used in this software can be found here:
+
+http://coins.labs.thedextrousweb.com/data/postgresql/
+
+Plain old CSV files (UTF-8, UNIX line-endings, gzipped), can be found here (total download: 131MB, unzipped: 5.1GB):
+
+http://coins.labs.thedextrousweb.com/data/csv/

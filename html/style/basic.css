@@ -1,0 +1,40 @@
+/* page styles */
+body { font-family: arial, sans-serif; margin:0; padding: 0; background: #eee; }
+#container { width: 900px; margin: 0 auto; background: #fff; padding: 5px 20px 20px;}
+table {  border-collapse: collapse; }
+h1,h2,h3,h4 { font-family: georgia, serif; font-weight: normal;}
+td, th { 
+   text-align: left; 
+   border: 1px solid #ddd; 
+   padding:2px 5px; 
+   }
+
+li { padding-bottom: 5px; }
+caption {margin: 0 0 .5em; font-weight: bold; }
+p.logos {
+  margin: 0 auto;
+  padding: 50px 0 30px;
+  overflow: auto;
+}
+p.logos .rs {
+  float: left;
+}
+p.logos .gnm {
+  float: left;
+}
+p.logos .dxw {
+  float: left;
+}
+
+p.logos img {
+  border: none;
+  padding-left: 30px;
+}
+
+p.logos img.dxw {
+  padding-left: 50px;
+}
+p.logos img.rs {
+  padding: 0;
+}
+.clear { clear: both; }

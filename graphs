@@ -1,0 +1,235 @@
+#!/usr/bin/env ruby
+require 'rubygems'
+require 'date'
+require 'pg'
+require 'yaml'
+require 'json'
+require 'digest/md5'
+
+MONTHS = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4] #, 5]
+# (For each Department,) take each month's Forecast outturn, limit to subtype submitted and sum the values for each pog and produce a graph.
+# May currently excluded because there's no data for it yet
+# Totals not being produced because we're using a stacked graph rather than a plain line graph
+
+def do_query(conn, query)
+  file = './cache/' + Digest::MD5.hexdigest(query.gsub(/\W+/, '_'))
+  if File.exists?(file)
+    results = YAML::load(File.open(file).read)
+  else
+    results = conn.exec(query).to_a
+    File.open(file, 'w'){|f| f.write(results.to_yaml) }
+  end
+
+  results
+end
+
+def write_html(filename, title, &block)
+  File.open(filename, 'w') do |f|
+    f.write('
+      <!DOCTYPE>
+      <html>
+      <head>
+        <title>' + title + ' - Government\'s spending forecasts</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" /> 
+        <script type="text/javascript" src="http://www.google.com/jsapi"></script>
+        <link rel="stylesheet" type="text/css" href="style/basic.css"  /> 
+      </head>
+      <body>
+        <div id="container">
+          ' + yield + '
+        </div>
+      </body>
+      </html>')
+  end
+end
+
+def get_dept_data(&block)
+  conn = PGconn.connect(:dbname => 'coins')
+  depts = do_query(conn, "select distinct department_description from coins_data_coinsdata order by department_description");
+  depts.each do |dept|
+    dept = dept['department_description']
+    
+    forecast_sums = []
+    data = {}#{'Total' => []}
+    current_index = 0
+    MONTHS.each do |month_num|
+      month = Date.new(1,month_num,1).strftime('%B')
+
+      month_sum = do_query(conn, "
+        select sum(value) 
+        from coins_data_coinsdata 
+        where department_description='#{dept.gsub(/'/, "\\'")}' and data_type='Forecast Outturn #{month}' and data_subtype='Forecast Outturn (Submitted)'
+      ")
+
+#if month_sum.empty? || month_sum.first['sum'] == nil
+#        data['Total'][current_index] = 0
+#      else
+#        data['Total'][current_index] = month_sum.first['sum'].to_i
+#      end
+
+      accounts = do_query(conn, "
+        select programme_object_code||' '||programme_object_description as pog, sum(value)
+        from coins_data_coinsdata 
+        where department_description='#{dept.gsub(/'/, "\\'")}' and data_type='Forecast Outturn #{month}' and data_subtype='Forecast Outturn (Submitted)'
+        group by pog
+      ")
+
+      accounts.each do |account|
+        data[account['pog']] ||= []
+
+        if account['sum'] == nil
+          data[account['pog']][current_index] = 0
+        else
+          data[account['pog']][current_index] = account['sum'].to_i
+        end
+      end
+
+      current_index += 1
+    end
+
+    data.each do |label, values|
+      data[label].map!{|m| m.nil? ? 0 : m}
+      while data[label].length < 11
+        data[label] << 0
+      end
+      data.delete_if{|k,v| v.uniq == [0]}
+    end
+
+    next if data.all?{|k,v| v.uniq == [0]}
+
+    yield(dept, data)
+  end
+end
+
+index = ''
+get_dept_data() do |dept, data|
+  file = "#{dept.gsub(/\W+/, '_')}.html"
+  index += "<li><a href='#{file}'>#{dept}</a></li>"
+  write_html("html/#{file}", dept) do
+    html = "
+      <h2>#{dept}</h2> 
+      <script type='text/javascript'>
+        google.load('visualization', '1', {packages:['corechart']});
+        var json=#{data.to_json};
+        
+        // Called when the Visualization API is loaded.
+        function drawVisualization() {
+          // Create and populate a data table.
+          var data = new google.visualization.DataTable();
+          data.addColumn('string', 'Month');
+          var max = 0;
+          for (var key in json) {
+            var value = json[key];
+            data.addColumn('number', key);
+            if (value.length > max)
+              max = value.length;
+          }
+          data.addRows(max);
+
+          var month = ['Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','March','Apr'];
+          var n = 1;
+          for (var key in json) {
+            var value = json[key];
+            var m = 0;
+            for (var item in value) {
+              data.setCell(m, n, value[item]);
+              if(n==1)
+                data.setCell(m, 0, month[m]);
+              m++;
+            }
+            n++;
+          }
+
+          // Make the chart
+          var chart = new google.visualization.AreaChart(document.getElementById('chart_div'));
+          chart.draw(data, {isStacked: true, width: 900, height: 800, title: '#{dept}'});
+        }
+        google.setOnLoadCallback(drawVisualization);
+      </script>
+      <p>All amounts are in £1000s</p>
+      <div id='chart_div'></div>
+      <table>
+      <thead><tr><th>Programme</th>"
+
+    MONTHS.map{|m|Date.new(1,m,1).strftime('%b')}.each {|m| html += "<th scope='col'>#{m}</th>" }
+    html += "</tr></thead><tbody>"
+
+    odd = true
+    data.each do |label, values|
+      html += "<tr><th scope='row'"
+      html += " class='odd'" if odd
+      html +=">#{label}</th>";
+      
+      values.each do |v| 
+        html += "<td"
+        html += " class='odd'" if odd
+        html += ">#{v}</td>" 
+      end
+
+      html += "</tr>"
+
+      odd = !odd
+    end
+
+    html += "</tbody></table>"
+  end
+end
+
+write_html("html/index.html", 'Index') do
+  "
+  <h2>Government's spending forecasts</h2>
+  <p>
+    Every month, each government department submits to the Treasury an estimate of its annual spending, 
+    broken down by programme. These graphs display how those monthly estimates, known as Forecast Outturns,
+    change.
+  <p>
+
+  <p>
+    These graphs might be interesting because they might allow us to spot where programmes have been expanded
+    or cut. Where budgets have been cut, we might be able to see how the reduced income has been distributed
+    across programmes. Sometimes, it just raises interesting questions: like why the 
+    <a href='Department_of_Energy_and_Climate_Change.html'>Department of Energy and Climate Change's</a> estimate 
+    of spending on \"NDA non-voted AME\" increased from £361m in December 2009 to £4.2bn in February 2010.
+  </p>
+
+  <h3>Limitations</h3>
+
+  <p>
+    These charts have been generated using the <a href='http://data.gov.uk/node/9556'>COINS data</a> released 
+    by the government last week. This data is very complicated. These graphs might be wrong, so you should 
+    interpret them with caution. If you think you've found something interesting, use it as something upon 
+    which to base a Freedom of Information Act request before you draw any conclusions.
+  </p>
+
+  <p>
+    In particular, the graphs with a lot of data on them are very hard to read. Sometimes the lines are very
+    close together, making it hard to click on a point and see what line it belonds to. Because there are so
+    many lines, they won't all fit on the legend. So, you'll need to use a combination of the graph and the
+    table below it to figure out what things mean.
+  </p>
+
+  <p>
+    We've released the code that generates these graphs, and the PostgreSQL database we're using to query COINS.
+    If you'd like to work on this some more to make it better, we're all for it! Visit us on 
+    <a href='http://www.github.com/dxw/'>Github</a> for more information.
+  </p>
+
+  <h2>Departments</h2>
+  
+  <ul>#{index}</ul>
+  
+  <h2>Credits</h2>
+  
+  <p>
+    Built by Harry Metcalfe and Tom Adams, two <a href='http://www.rewiredstate.org/'>Rewired State</a> hackers 
+    whose day job is at <a href='http://thedextrousweb.com'>Dextrous Web</a>. Development funded by the 
+    <a href='http://www.guardian.co.u'>Guardian</a>.
+  </p>
+
+  <p class='logos'>
+    <a href='http://www.rewiredstate.org/'><img class='rs' src='images/rewired_state.png' alt='Rewired State' /></a>
+    <a href='http://thedextrousweb.com'><img class='dxw' src='images/inline_logo_350.png' alt='Dextrous Web' /></a>
+    <a href='http://www.guardian.co.uk/open-platform'><img class='gnm' src='images/guardian.jpg' alt='Guardian: Open platform' /></a>
+  </p>
+  "
+end
