@@ -1,6 +1,8 @@
 = forecast-outturns
 
-Working example:
+Every month, each government department submits to the Treasury an estimate of its annual spending, broken down by programme. These graphs display how those monthly estimates, known as Forecast Outturns, change.
+
+== Working example
 
 http://coins.labs.thedextrousweb.com/
 

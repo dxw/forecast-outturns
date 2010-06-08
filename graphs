@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 require 'rubygems'
+require 'google_chart'
 require 'date'
 require 'pg'
 require 'yaml'
@@ -142,11 +143,11 @@ get_dept_data() do |dept, data|
 
           // Make the chart
           var chart = new google.visualization.AreaChart(document.getElementById('chart_div'));
-          chart.draw(data, {isStacked: true, width: 900, height: 800, title: '#{dept}'});
+          chart.draw(data, {isStacked: true, width: 900, height: 800, title: '#{dept} (Forecast Outturns, 2009-10)'});
         }
         google.setOnLoadCallback(drawVisualization);
       </script>
-      <p>All amounts are in £1000s</p>
+      <p>All amounts are in £1000s. Graph not working? <a href='img_charts/#{file.gsub(/html$/, 'png')}'>View an alternative version</a></p>
       <div id='chart_div'></div>
       <table>
       <thead><tr><th>Programme</th>"
@@ -207,6 +208,8 @@ write_html("html/index.html", 'Index') do
     many lines, they won't all fit on the legend. So, you'll need to use a combination of the graph and the
     table below it to figure out what things mean.
   </p>
+
+  <p>There is no data for May 2010, as it has not yet been released by the Treasury.</p>
 
   <p>
     We've released the code that generates these graphs, and the PostgreSQL database we're using to query COINS.
